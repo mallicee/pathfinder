@@ -1,0 +1,19 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  browser-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run test suite in headless Chrome
+        run: |
+          out=$(google-chrome --headless=new --no-sandbox --disable-gpu \
+            --virtual-time-budget=30000 --dump-dom "file://$PWD/tests/index.html")
+          echo "$out" | sed -n 's/.*<title>\(.*\)<\/title>.*/Result: \1/p'
+          echo "$out" | grep -E '✓|✗' | sed -e 's/<[^>]*>//g'
+          echo "$out" | grep -q '<title>PASS'

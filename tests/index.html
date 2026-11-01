@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pathfinder — tests</title>
+  <style>
+    body { font: 14px/1.5 ui-monospace, Consolas, monospace; background: #0a0f1e; color: #e6ebf5; padding: 20px; }
+    .pass { color: #4ade80; } .fail { color: #fb7185; }
+  </style>
+</head>
+<body>
+  <h1>Pathfinder tests</h1>
+  <pre id="out"></pre>
+  <script src="../js/algorithms.js"></script>
+  <script src="../js/mazes.js"></script>
+  <script>
+    'use strict';
+    const out = document.getElementById('out');
+    let passed = 0, failed = 0;
+    function test(name, fn) {
+      try { fn(); passed++; out.innerHTML += `<span class="pass">✓ ${name}</span>\n`; }
+      catch (e) { failed++; out.innerHTML += `<span class="fail">✗ ${name}: ${e.message}</span>\n`; }
+    }
+    function assert(cond, msg) { if (!cond) throw new Error(msg || 'assertion failed'); }
+
+    // Builds a grid from ASCII: '#' wall, 'w' weight, 'S' start, 'E' end.
+    function parse(rowsText) {
+      const rows = rowsText.length, cols = rowsText[0].length;
+      const g = { rows, cols, walls: new Uint8Array(rows * cols), weights: new Uint8Array(rows * cols) };
+      let start = -1, end = -1;
+      rowsText.forEach((line, r) => [...line].forEach((ch, c) => {
+        const i = r * cols + c;
+        if (ch === '#') g.walls[i] = 1;
+        if (ch === 'w') g.weights[i] = 1;
+        if (ch === 'S') start = i;
+        if (ch === 'E') end = i;
+      }));
+      return { g, start, end };
+    }
+
+    function validPath(g, path, start, end) {
+      if (path[0] !== start || path[path.length - 1] !== end) return false;
+      for (let k = 1; k < path.length; k++) {
+        const a = path[k - 1], b = path[k];
+        if (g.walls[b]) return false;
+        if (!Pathfinding.neighbors(g, a).includes(b)) return false;
+      }
+      return true;
+    }
+
+    // Reference: Bellman-Ford style relaxation for true shortest cost.
+    function referenceCost(g, start, end, weighted) {
+      const n = g.rows * g.cols, d = new Array(n).fill(Infinity);
+      d[start] = 0;
+      for (let changed = true; changed;) {
+        changed = false;
+        for (let i = 0; i < n; i++) {
+          if (d[i] === Infinity) continue;
+          for (const nb of Pathfinding.neighbors(g, i)) {
+            const c = d[i] + (weighted && g.weights[nb] ? Pathfinding.WEIGHT_COST : 1);
+            if (c < d[nb]) { d[nb] = c; changed = true; }
+          }
+        }
+      }
+      return d[end];
+    }
+
+    const names = Object.keys(Pathfinding.algorithms);
+
+    test('MinHeap pops in sorted order', () => {
+      const h = new Pathfinding.MinHeap((a, b) => a < b);
+      const xs = Array.from({ length: 500 }, () => Math.random());
+      xs.forEach((x) => h.push(x));
+      const sorted = [...xs].sort((a, b) => a - b);
+      sorted.forEach((x) => assert(h.pop() === x));
+    });
+
+    const open = parse([
+      'S.........',
+      '..........',
+      '.........E',
+    ]);
+    for (const name of names) {
+      test(`${name}: finds a valid path on an open grid`, () => {
+        const r = Pathfinding.run(name, open.g, open.start, open.end);
+        assert(r.found && validPath(open.g, r.path, open.start, open.end));
+      });
+    }
+
+    const blocked = parse([
+      'S..#....',
+      '...#....',
+      '...#...E',
+    ]);
+    for (const name of names) {
+      test(`${name}: reports no path when the target is walled off`, () => {
+        const r = Pathfinding.run(name, blocked.g, blocked.start, blocked.end);
+        assert(!r.found && r.path.length === 0 && r.visited.length > 0);
+      });
+    }
+
+    const weighted = parse([
+      'S.wwwww.E',
+      '.#######.',
+      '.........',
+    ]);
+    test('dijkstra and A* route around expensive weights', () => {
+      for (const name of ['dijkstra', 'astar']) {
+        const r = Pathfinding.run(name, weighted.g, weighted.start, weighted.end);
+        assert(r.cost === 12, `${name} cost ${r.cost}`);
+      }
+    });
+    test('BFS ignores weights and takes the fewest steps', () => {
+      const r = Pathfinding.run('bfs', weighted.g, weighted.start, weighted.end);
+      assert(r.path.length - 1 === 8, `steps ${r.path.length - 1}`);
+    });
+
+    test('start === end yields a single-cell path', () => {
+      for (const name of names) {
+        const r = Pathfinding.run(name, open.g, 5, 5);
+        assert(r.found && r.path.length === 1 && r.path[0] === 5, name);
+      }
+    });
+
+    test('optimal algorithms match a reference solver on 200 random boards', () => {
+      for (let t = 0; t < 200; t++) {
+        const rows = 15, cols = 21, n = rows * cols;
+        const g = { rows, cols, walls: new Uint8Array(n), weights: new Uint8Array(n) };
+        for (let i = 0; i < n; i++) {
+          const x = Math.random();
+          if (x < 0.25) g.walls[i] = 1; else if (x < 0.45) g.weights[i] = 1;
+        }
+        const start = 0, end = n - 1;
+        g.walls[start] = g.walls[end] = 0;
+        const wRef = referenceCost(g, start, end, true);
+        const uRef = referenceCost(g, start, end, false);
+        for (const name of names) {
+          const r = Pathfinding.run(name, g, start, end);
+          assert(r.found === (wRef !== Infinity), `${name} found mismatch`);
+          if (!r.found) continue;
+          assert(validPath(g, r.path, start, end), `${name} invalid path`);
+          const meta = Pathfinding.algorithms[name];
+          if (meta.optimal && meta.weighted) assert(r.cost === wRef, `${name} cost ${r.cost} != ${wRef}`);
+          if (meta.optimal && !meta.weighted) assert(r.path.length - 1 === uRef, `${name} steps ${r.path.length - 1} != ${uRef}`);
+        }
+      }
+    });
+
+    function applyMaze(m, rows, cols) {
+      const walls = new Uint8Array(rows * cols).fill(m.fill ? 1 : 0);
+      for (const [i, v] of m.ops) walls[i] = v;
+      return { rows, cols, walls, weights: new Uint8Array(rows * cols) };
+    }
+    for (const type of ['division', 'backtracker']) {
+      test(`${type} maze connects all odd/odd rooms`, () => {
+        for (let t = 0; t < 30; t++) {
+          const rows = 21, cols = 41;
+          const g = applyMaze(Mazes[type](rows, cols), rows, cols);
+          const start = 1 * cols + 1;
+          for (let r = 1; r < rows; r += 2) for (let c = 1; c < cols; c += 2) {
+            assert(!g.walls[r * cols + c], `room ${r},${c} is a wall`);
+          }
+          const r = Pathfinding.run('bfs', g, start, (rows - 2) * cols + (cols - 2));
+          assert(r.found, 'corners not connected');
+        }
+      });
+    }
+
+    out.innerHTML += `\n${passed} passed, ${failed} failed`;
+    document.title = failed ? `FAIL (${failed})` : `PASS (${passed})`;
+    document.body.dataset.result = failed ? 'fail' : 'pass';
+  </script>
+</body>
+</html>

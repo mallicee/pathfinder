@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pathfinder — Algorithm Visualizer</title>
+  <meta name="description" content="Interactive visualizer for pathfinding and maze generation algorithms: A*, Dijkstra, BFS, DFS and more.">
+  <meta name="theme-color" content="#0a0f1e">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Pathfinder — Algorithm Visualizer">
+  <meta property="og:description" content="Watch A*, Dijkstra, BFS and DFS search a grid in real time. Draw walls, generate mazes, compare algorithms.">
+  <meta property="og:url" content="https://mallicee.github.io/pathfinder/">
+  <meta property="og:image" content="https://mallicee.github.io/pathfinder/docs/screenshot.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <h1>Pathfinder</h1>
+    </div>
+
+    <div class="controls">
+      <label class="field">
+        <span>Algorithm</span>
+        <select id="algorithm">
+          <option value="astar">A* Search</option>
+          <option value="dijkstra">Dijkstra</option>
+          <option value="greedy">Greedy Best-First</option>
+          <option value="bfs">Breadth-First Search</option>
+          <option value="bidirectional">Bidirectional BFS</option>
+          <option value="dfs">Depth-First Search</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Maze</span>
+        <select id="maze">
+          <option value="">Generate…</option>
+          <option value="division">Recursive division</option>
+          <option value="backtracker">Recursive backtracker</option>
+          <option value="random">Random walls</option>
+          <option value="weights">Random weights</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Speed</span>
+        <select id="speed">
+          <option value="0.5">Slow</option>
+          <option value="2" selected>Normal</option>
+          <option value="6">Fast</option>
+          <option value="0">Instant</option>
+        </select>
+      </label>
+
+      <div class="field">
+        <span>Brush</span>
+        <div class="segmented" role="radiogroup" aria-label="Brush">
+          <button type="button" role="radio" aria-checked="true" data-brush="wall" class="active">Wall</button>
+          <button type="button" role="radio" aria-checked="false" data-brush="weight">Weight</button>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="button" id="run" class="primary">Visualize</button>
+        <button type="button" id="compare">Compare all</button>
+        <button type="button" id="clearPath">Clear path</button>
+        <button type="button" id="clearBoard">Clear board</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="info">
+      <p id="algoInfo" class="algo-info"></p>
+      <ul class="legend">
+        <li><i class="swatch start"></i>Start</li>
+        <li><i class="swatch end"></i>Target</li>
+        <li><i class="swatch wall"></i>Wall</li>
+        <li><i class="swatch weight"></i><span>Weight (cost <span id="weightCost">10</span>)</span></li>
+        <li><i class="swatch visited"></i>Visited</li>
+        <li><i class="swatch path"></i>Path</li>
+      </ul>
+    </section>
+
+    <div id="boardWrap" class="board-wrap">
+      <div id="board" class="board" aria-label="Grid. Drag to draw walls, drag start or target to move them."></div>
+    </div>
+
+    <section class="stats" aria-live="polite">
+      <div class="stat"><span>Status</span><strong id="statStatus">Ready</strong></div>
+      <div class="stat"><span>Visited</span><strong id="statVisited">—</strong></div>
+      <div class="stat"><span>Path length</span><strong id="statLength">—</strong></div>
+      <div class="stat"><span>Path cost</span><strong id="statCost">—</strong></div>
+      <div class="stat"><span>Compute time</span><strong id="statTime">—</strong></div>
+    </section>
+  </main>
+
+  <footer class="hints">
+    Drag on the grid to draw · <kbd>Shift</kbd>+drag for weights · drag ▶ / ◎ to move ·
+    after a run, edits re-solve live · <kbd>Space</kbd> run · <kbd>C</kbd> clear path · <kbd>W</kbd> switch brush · <kbd>K</kbd> compare
+  </footer>
+
+  <dialog id="compareDialog" class="dialog" aria-labelledby="compareTitle">
+    <form method="dialog" class="dialog-head">
+      <h2 id="compareTitle">Algorithm comparison</h2>
+      <button type="submit" class="icon-btn" aria-label="Close">✕</button>
+    </form>
+    <p class="dialog-sub">Every algorithm on the current board. Click a row to show it on the grid.</p>
+    <div class="table-wrap">
+      <table class="compare">
+        <thead>
+          <tr><th>Algorithm</th><th>Visited</th><th>Steps</th><th>Cost</th><th>Time</th></tr>
+        </thead>
+        <tbody id="compareBody"></tbody>
+      </table>
+    </div>
+    <p class="dialog-note">★ best in column · fewer visited cells = less work · cost counts weights</p>
+  </dialog>
+
+  <script src="js/algorithms.js"></script>
+  <script src="js/mazes.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
